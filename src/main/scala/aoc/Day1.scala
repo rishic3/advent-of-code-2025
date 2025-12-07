@@ -2,67 +2,77 @@ package aoc
 
 import scala.io.Source
 
-class Dial(dialStart: Int, dialSize: Int) {
-  var currPos = dialStart
+case class Dial(pos: Int, size: Int, zeroClicks: Int = 0) {
 
   // part 1
-  def adjust(distance: Int, clockwise: Boolean): Unit = {
-    currPos = if (clockwise) currPos + distance else currPos - distance
-    currPos = Math.floorMod(currPos, dialSize)
+  def adjust(distance: Int, clockwise: Boolean): Dial = {
+    val dir = if (clockwise) 1 else -1
+    val newPos = Math.floorMod(pos + (distance * dir), size)
+    copy(pos = newPos)
   }
 
   // part 2
-  var zeroClicks = 0
-  def adjustClicks(distance: Int, clockwise: Boolean): Unit = {
-    val includePass = currPos != 0
-    val modDist = distance % dialSize
-    zeroClicks += distance / dialSize
+  def adjustClicks(distance: Int, clockwise: Boolean): Dial = {
+    val modDist = distance % size
+    val revolutions = distance / size
 
-    if (clockwise) {
-      currPos += modDist
-      if (includePass && currPos >= dialSize) zeroClicks += 1
+    val (newPos, crossedZero) = if (clockwise) {
+      val next = pos + modDist
+      val crossed = pos != 0 && next >= size
+      (next, crossed)
     } else {
-      currPos -= modDist
-      if (includePass && currPos <= 0) zeroClicks += 1
+      val next = pos - modDist
+      val crossed = pos != 0 && next <= 0
+      (next, crossed)
     }
 
-    currPos = Math.floorMod(currPos, dialSize)
+    val addedClicks = revolutions + (if (crossedZero) 1 else 0)
+
+    copy(pos = Math.floorMod(newPos, size), zeroClicks = zeroClicks + addedClicks)
   }
 }
 
 object Day1 {
 
-  // part 1
-  def computePassword(source: scala.io.BufferedSource): Int = {
-    val dial = new Dial(50, 100)
-    var zeroCount = 0
+  sealed trait Action
+  case class Left(distance: Int) extends Action
+  case class Right(distance: Int) extends Action
 
-    for (line <- source.getLines()) {
-      line match {
-        case s if s.startsWith("L") => dial.adjust(s.tail.toInt, false)
-        case s if s.startsWith("R") => dial.adjust(s.tail.toInt, true)
-        case _ => throw new IllegalArgumentException(s"illegal input: $line")
+  def parseAction(line: String): Action = line.head match {
+    case 'L' => Left(line.tail.toInt)
+    case 'R' => Right(line.tail.toInt)
+    case _ => throw new IllegalArgumentException(s"illegal input: $line")
+  }
+
+  // part 1
+  def computePassword(lines: Iterator[String]): Int = {
+    val initDial = new Dial(pos = 50, size = 100)
+
+    val finalDial = lines.foldLeft((initDial, 0)) { case ((dial, zeroClicks), line) =>
+      val action = parseAction(line)
+      val newDial = action match {
+        case Left(dist) => dial.adjust(dist, clockwise = false)
+        case Right(dist) => dial.adjust(dist, clockwise = true)
       }
-      if (dial.currPos == 0) zeroCount += 1
+      val newClicks = if (newDial.pos == 0) zeroClicks + 1 else zeroClicks
+      (newDial, newClicks)
     }
 
-    zeroCount
+    finalDial._2
   }
 
   // part 2
-  def computeClickPassword(source: scala.io.BufferedSource): Int = {
-    val dial = new Dial(50, 100)
+  def computeClickPassword(lines: Iterator[String]): Int = {
+    val initDial = new Dial(pos = 50, size = 100)
 
-    for (line <- source.getLines()) {
-      line match {
-        case s if s.startsWith("L") => dial.adjustClicks(s.tail.toInt, false)
-        case s if s.startsWith("R") => dial.adjustClicks(s.tail.toInt, true)
-        case _ => throw new IllegalArgumentException(s"illegal input: $line")
+    val finalDial = lines.foldLeft(initDial) { case (dial, line) =>
+      parseAction(line) match {
+        case Left(dist) => dial.adjustClicks(dist, clockwise = false)
+        case Right(dist) => dial.adjustClicks(dist, clockwise = true)
       }
-      println(s"input: $line, zeroClicks: ${dial.zeroClicks}, currPos: ${dial.currPos}")
     }
 
-    dial.zeroClicks
+    finalDial.zeroClicks
   }
 
   def main(args: Array[String]): Unit = {
@@ -70,8 +80,10 @@ object Day1 {
 
     val source = Source.fromFile(args(0))
     try {
-      // println(s"Password: ${computePassword(source)}")
-      println(s"Password: ${computeClickPassword(source)}")
+      val lines = source.getLines()
+
+      // println(s"Password: ${computePassword(lines)}")
+      println(s"Password: ${computeClickPassword(lines)}")
     } finally {
       source.close()
     }
