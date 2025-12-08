@@ -34,7 +34,10 @@ object Day2 {
   }
 
   def parseLine(line: String): Array[(BigInt, BigInt)] = {
-    line.trim().split(',').map(_.split('-')).map(arr => (BigInt(arr(0)), BigInt(arr(1))))
+    line.trim()
+      .split(',')
+      .map(_.split('-'))
+      .map(arr => (BigInt(arr(0)), BigInt(arr(1))))
   }
 
   def computeInvalidIDSum(line: String): BigInt = {
